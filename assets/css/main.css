@@ -22,7 +22,7 @@ body {
 }
 
 .page {
-  max-width: 1440px;
+  max-width: 1680px;
   margin: 0 auto;
   padding: 32px 24px 64px;
 }
@@ -32,6 +32,13 @@ header {
   flex-direction: column;
   gap: 12px;
   margin-bottom: 24px;
+}
+
+.title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .title {
@@ -45,6 +52,13 @@ header {
   margin: 0;
   color: var(--muted);
   font-size: 15px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
 }
 
 .status {
@@ -68,11 +82,63 @@ header {
   background: var(--accent);
 }
 
+.reset-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--grid);
+  background: #f4f7f2;
+  color: var(--muted);
+  font-size: 14px;
+  cursor: pointer;
+  box-shadow: none;
+}
+
+.status-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ghost-btn {
+  border: 1px solid var(--grid);
+  background: #f4f7f2;
+  color: var(--muted);
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.ghost-btn:hover {
+  background: #e8f1ea;
+  color: var(--accent);
+}
+
+.ghost-btn.active {
+  background: var(--accent-soft);
+  color: var(--ink);
+  border-color: #c3d8c8;
+}
+
+.reset-btn:hover {
+  background: #e8f1ea;
+  color: var(--accent);
+}
+
+.reset-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
 .table-wrap {
   background: var(--card);
   border-radius: 18px;
   border: 1px solid var(--grid);
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 18px 40px rgba(36, 53, 43, 0.08);
   animation: fadeIn 0.6s ease-out;
 }
@@ -81,7 +147,8 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: 13px;
-  min-width: 1200px;
+  min-width: 1400px;
+  table-layout: fixed;
 }
 
 thead tr:first-child th {
@@ -93,17 +160,42 @@ thead tr:first-child th {
   border-bottom: 1px solid var(--grid);
 }
 
+thead tr:first-child th[data-group="단지정보"] {
+  background: #f6cfd0;
+}
+
+thead tr:first-child th[data-group="전고점 정보"] {
+  background: #cfe0ff;
+}
+
+thead tr:first-child th[data-group="시세"] {
+  background: #fff1c9;
+}
+
 thead tr:nth-child(2) th {
   background: #f8f9f6;
   color: var(--muted);
   font-weight: 600;
   border-bottom: 1px solid var(--grid);
+  position: relative;
 }
 
 th,
 td {
   padding: 10px 12px;
   border-right: 1px solid var(--grid);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+th {
+  overflow: visible;
+}
+
+th:first-child,
+td:first-child {
+  min-width: 180px;
+  white-space: nowrap;
 }
 
 th:last-child,
@@ -123,14 +215,86 @@ tbody tr:hover {
   background: #f1f7f2;
 }
 
+.col-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  position: relative;
+}
+
+.col-title {
+  white-space: nowrap;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.col-title:hover {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+.col-title.active {
+  color: var(--accent);
+}
+
+.icon-btn {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font-size: 11px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.icon-btn:hover {
+  background: #edf3ee;
+}
+
+.icon-btn.active {
+  color: var(--accent);
+}
+
+.sort-indicator.active {
+  font-weight: 700;
+}
+
+.filter-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  background: var(--card);
+  border: 1px solid var(--grid);
+  border-radius: 10px;
+  padding: 8px;
+  box-shadow: 0 12px 24px rgba(36, 53, 43, 0.12);
+  min-width: 180px;
+  max-height: 240px;
+  overflow: auto;
+  z-index: 10;
+}
+
+.filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 2px;
+  color: var(--ink);
+}
+
+.filter-divider {
+  height: 1px;
+  background: var(--grid);
+  margin: 6px 0;
+}
+
 .empty {
   padding: 40px;
   text-align: center;
   color: var(--muted);
-}
-
-.scroll {
-  overflow-x: auto;
 }
 
 @keyframes fadeIn {
@@ -147,6 +311,16 @@ tbody tr:hover {
 @media (max-width: 900px) {
   .page {
     padding: 24px 16px 48px;
+  }
+
+  .title-row {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .status-row {
+    flex-direction: column;
+    align-items: flex-start;
   }
 
   .table-wrap {

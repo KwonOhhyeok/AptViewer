@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AptViewer</title>
+  <title>아파트 시세 분석</title>
+  <link rel="icon" href="assets/img/aptviewer.png" type="image/png" />
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
   <link rel="stylesheet" href="assets/css/main.css" />
@@ -11,29 +12,94 @@
 <body>
   <div id="app" class="page">
     <header>
-      <h1 class="title">AptViewer</h1>
-      <p class="subtitle">Google 스프레드시트 summary 시트 데이터를 그대로 렌더링합니다.</p>
-      <div class="status" v-if="statusMessage">
-        <span class="status-dot"></span>
-        <span>{{ statusMessage }}</span>
+      <div class="title-row">
+        <h1 class="title">아파트 시세 분석</h1>
+      </div>
+      <div class="status-row" v-if="statusMessage">
+        <div class="status">
+          <span class="status-dot"></span>
+          <span>{{ statusMessage }}</span>
+        </div>
+        <div class="status-actions">
+          <button
+            class="ghost-btn"
+            type="button"
+            @click="toggleHideEmptyRows"
+            :class="{ active: hideEmptyRows }"
+          >
+            빈 값 제거
+          </button>
+          <button class="reset-btn" type="button" @click="resetFilters" aria-label="필터 초기화">
+            <img class="reset-icon" src="assets/img/refresh.png" alt="" />
+          </button>
+        </div>
       </div>
     </header>
 
     <section class="table-wrap">
-      <div class="scroll">
         <table v-if="tableRows.length">
           <thead>
             <tr>
-              <th colspan="10">단지정보</th>
-              <th colspan="2">전고점 정보</th>
-              <th colspan="6">시세</th>
+              <th
+                v-for="group in visibleGroups"
+                :key="group.title"
+                :colspan="group.colspan"
+                :data-group="group.title"
+              >
+                {{ group.title }}
+              </th>
             </tr>
             <tr>
-              <th v-for="(col, idx) in headerRow" :key="idx">{{ col }}</th>
+              <th v-for="col in visibleColumns" :key="col.index">
+                <div class="col-head">
+                  <span
+                    class="col-title"
+                    :class="{ active: isFilterActive(col) }"
+                    @click.stop="toggleFilterMenu(col)"
+                  >
+                    {{ col.name }}
+                  </span>
+                  <button
+                    class="icon-btn sort-indicator"
+                    :class="{ active: sortKey === col.index }"
+                    @click.stop="toggleSort(col)"
+                    type="button"
+                  >
+                    {{ sortIcon(col) }}
+                  </button>
+                  <div
+                    v-if="openFilterKey === col.index"
+                    class="filter-menu"
+                    @click.stop
+                  >
+                    <label class="filter-item">
+                      <input
+                        type="checkbox"
+                        :checked="isAllSelected(col)"
+                        @change="toggleAll(col, $event)"
+                      />
+                      <span>전체</span>
+                    </label>
+                    <div class="filter-divider"></div>
+                    <label
+                      v-for="item in columnValuesFor(col)"
+                      :key="item.value"
+                      class="filter-item"
+                    >
+                      <input
+                        type="checkbox"
+                        :checked="isValueChecked(col, item.value)"
+                        @change="toggleValue(col, item.value)"
+                      />
+                      <span>{{ item.label }}</span>
+                    </label>
+                  </div>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(row, idx) in sortedRows" :key="idx">
+            <tr v-for="(row, idx) in visibleRows" :key="idx">
               <td v-for="(cell, cellIdx) in row" :key="cellIdx">{{ cell }}</td>
             </tr>
           </tbody>
@@ -41,10 +107,10 @@
         <div v-else class="empty">
           <p>데이터가 없습니다. 스프레드시트 URL 설정을 확인해주세요.</p>
         </div>
-      </div>
     </section>
   </div>
 
+  <script src="assets/js/config.js"></script>
   <script src="assets/js/app.js"></script>
 </body>
 </html>

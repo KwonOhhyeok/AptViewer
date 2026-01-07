@@ -1,20 +1,23 @@
-const CSV_URL = ""; // 전체 CSV URL을 알고 있다면 여기에 입력하세요.
-const SHEET_ID = "14_LmYmNlC6pTaHo6nCr292XhSnImzN-G5yef8EUUGC4"; // 스프레드시트 ID
-const SHEET_GID = "0"; // summary 시트 gid (기본 첫 번째 시트)
-
-const REGION_IDX = 1;
-
-const buildCsvUrl = () => {
-  if (CSV_URL) return CSV_URL;
-  if (!SHEET_ID) return "";
-  return `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv&gid=${SHEET_GID}`;
-};
+const {
+  REGION_IDX,
+  normalizeColumn,
+  HIDDEN_COLUMNS,
+  COLUMN_GROUPS,
+  getGroupTitle,
+  buildCsvUrl,
+  parseNumber
+} = window.AptViewerConfig;
 
 Vue.createApp({
   data() {
     return {
       rawRows: [],
-      statusMessage: "데이터를 불러오는 중입니다..."
+      statusMessage: "데이터를 불러오는 중입니다...",
+      filters: {},
+      openFilterKey: null,
+      sortKey: null,
+      sortDir: "asc",
+      hideEmptyRows: false
     };
   },
   computed: {
@@ -23,6 +26,29 @@ Vue.createApp({
     },
     tableRows() {
       return this.rawRows.slice(2);
+    },
+    visibleColumns() {
+      return this.headerRow
+        .map((name, index) => ({
+          name,
+          index,
+          group: getGroupTitle(name),
+          normalized: normalizeColumn(name)
+        }))
+        .filter((col) => !HIDDEN_COLUMNS.has(col.normalized));
+    },
+    visibleHeaderRow() {
+      return this.visibleColumns.map((col) => col.name);
+    },
+    visibleGroups() {
+      const counts = new Map();
+      for (const col of this.visibleColumns) {
+        counts.set(col.group, (counts.get(col.group) || 0) + 1);
+      }
+      return COLUMN_GROUPS.map((group) => ({
+        title: group.title,
+        colspan: counts.get(group.title) || 0
+      })).filter((group) => group.colspan > 0);
     },
     sortedRows() {
       const rows = this.tableRows.slice();
@@ -40,9 +66,131 @@ Vue.createApp({
         if (rankDiff !== 0) return rankDiff;
         return aRegion.localeCompare(bRegion, "ko");
       });
+    },
+    columnValues() {
+      const values = {};
+      for (const col of this.visibleColumns) {
+        const key = col.normalized;
+        const bucket = new Map();
+        for (const row of this.tableRows) {
+          const cell = (row[col.index] ?? "").toString().trim();
+          const label = cell || "(빈값)";
+          if (!bucket.has(cell)) bucket.set(cell, label);
+        }
+        values[key] = Array.from(bucket.entries())
+          .map(([value, label]) => ({ value, label }))
+          .sort((a, b) => a.label.localeCompare(b.label, "ko"));
+      }
+      return values;
+    },
+    filteredRows() {
+      return this.sortedRows.filter((row) => {
+        if (this.hideEmptyRows) {
+          const hasEmpty = this.visibleColumns.some((col) => {
+            const cell = (row[col.index] ?? "").toString().trim();
+            return cell.length === 0 && col.normalized !== normalizeColumn("전세갯수");
+          });
+          if (hasEmpty) return false;
+        }
+        for (const col of this.visibleColumns) {
+          const key = col.normalized;
+          const selected = this.filters[key];
+          if (!selected) continue;
+          const cell = (row[col.index] ?? "").toString().trim();
+          if (!selected.includes(cell)) return false;
+        }
+        return true;
+      });
+    },
+    finalRows() {
+      const rows = this.filteredRows.slice();
+      if (this.sortKey === null) return rows;
+      const dir = this.sortDir === "asc" ? 1 : -1;
+      return rows.sort((a, b) => {
+        const left = (a[this.sortKey] ?? "").toString().trim();
+        const right = (b[this.sortKey] ?? "").toString().trim();
+        const leftNum = parseNumber(left);
+        const rightNum = parseNumber(right);
+        if (leftNum !== null && rightNum !== null) {
+          return (leftNum - rightNum) * dir;
+        }
+        return left.localeCompare(right, "ko") * dir;
+      });
+    },
+    visibleRows() {
+      return this.finalRows.map((row) =>
+        this.visibleColumns.map((col) => row[col.index] ?? "")
+      );
+    }
+  },
+  methods: {
+    filterKey(col) {
+      return col.normalized;
+    },
+    columnValuesFor(col) {
+      return this.columnValues[this.filterKey(col)] || [];
+    },
+    isFilterActive(col) {
+      return Array.isArray(this.filters[this.filterKey(col)]);
+    },
+    isAllSelected(col) {
+      const key = this.filterKey(col);
+      const values = this.columnValuesFor(col).map((item) => item.value);
+      const selected = this.filters[key];
+      return !selected || selected.length === values.length;
+    },
+    isValueChecked(col, value) {
+      const selected = this.filters[this.filterKey(col)];
+      if (!selected) return true;
+      return selected.includes(value);
+    },
+    toggleAll(col, event) {
+      const checked = event.target.checked;
+      const key = this.filterKey(col);
+      if (checked) {
+        delete this.filters[key];
+      } else {
+        this.filters[key] = [];
+      }
+    },
+    toggleValue(col, value) {
+      const key = this.filterKey(col);
+      const values = this.columnValuesFor(col).map((item) => item.value);
+      const current = this.filters[key] ? [...this.filters[key]] : [...values];
+      const idx = current.indexOf(value);
+      if (idx >= 0) current.splice(idx, 1);
+      else current.push(value);
+      if (current.length === values.length) delete this.filters[key];
+      else this.filters[key] = current;
+    },
+    toggleFilterMenu(col) {
+      this.openFilterKey = this.openFilterKey === col.index ? null : col.index;
+    },
+    toggleSort(col) {
+      if (this.sortKey === col.index) {
+        this.sortDir = this.sortDir === "asc" ? "desc" : "asc";
+      } else {
+        this.sortKey = col.index;
+        this.sortDir = "desc";
+      }
+    },
+    closeFilterMenu(event) {
+      if (!this.$el.contains(event.target)) this.openFilterKey = null;
+    },
+    sortIcon(col) {
+      if (this.sortKey !== col.index) return "▲";
+      return this.sortDir === "asc" ? "▲" : "▼";
+    },
+    resetFilters() {
+      this.filters = {};
+      this.openFilterKey = null;
+    },
+    toggleHideEmptyRows() {
+      this.hideEmptyRows = !this.hideEmptyRows;
     }
   },
   async mounted() {
+    document.addEventListener("click", this.closeFilterMenu);
     const url = buildCsvUrl();
     if (!url) {
       this.statusMessage = "CSV URL 또는 SHEET_ID를 설정해주세요.";
@@ -67,5 +215,8 @@ Vue.createApp({
       console.error("Failed to load data:", err);
       this.statusMessage = "데이터 로드 실패. 스프레드시트 공개 설정을 확인해주세요.";
     }
+  },
+  beforeUnmount() {
+    document.removeEventListener("click", this.closeFilterMenu);
   }
 }).mount("#app");
