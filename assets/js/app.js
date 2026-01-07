@@ -52,6 +52,12 @@ Vue.createApp({
     },
     sortedRows() {
       const rows = this.tableRows.slice();
+      const getCell = (row, name) => {
+        const idx = this.visibleColumns.find((col) => col.normalized === normalizeColumn(name))
+          ?.index;
+        if (idx === undefined) return "";
+        return (row[idx] ?? "").toString().trim();
+      };
       const rank = (region) => {
         if (!region) return 3;
         const trimmed = region.trim();
@@ -64,7 +70,18 @@ Vue.createApp({
         const bRegion = (b[REGION_IDX] || "").trim();
         const rankDiff = rank(aRegion) - rank(bRegion);
         if (rankDiff !== 0) return rankDiff;
-        return aRegion.localeCompare(bRegion, "ko");
+        const regionCompare = aRegion.localeCompare(bRegion, "ko");
+        if (regionCompare !== 0) return regionCompare;
+        const areaCompare = getCell(a, "생활권(동)").localeCompare(getCell(b, "생활권(동)"), "ko");
+        if (areaCompare !== 0) return areaCompare;
+        const complexCompare = getCell(a, "단지명").localeCompare(getCell(b, "단지명"), "ko");
+        if (complexCompare !== 0) return complexCompare;
+        const exclusiveCompare = getCell(a, "전용 면적").localeCompare(
+          getCell(b, "전용 면적"),
+          "ko"
+        );
+        if (exclusiveCompare !== 0) return exclusiveCompare;
+        return getCell(a, "공급 평형").localeCompare(getCell(b, "공급 평형"), "ko");
       });
     },
     columnValues() {
@@ -209,6 +226,40 @@ Vue.createApp({
         while (padded.length < 18) padded.push("");
         return padded;
       });
+
+      const headerRow = this.rawRows[1] || [];
+      const keyIndex = headerRow.findIndex(
+        (name) => normalizeColumn(name) === normalizeColumn("단지접근키")
+      );
+      if (keyIndex >= 0) {
+        const infoIndexes = headerRow
+          .map((name, index) => ({
+            index,
+            group: getGroupTitle(name),
+            normalized: normalizeColumn(name)
+          }))
+          .filter(
+            (col) =>
+              (col.group === "단지정보" || col.group === "시세") &&
+              !HIDDEN_COLUMNS.has(col.normalized)
+          )
+          .map((col) => col.index);
+
+        const deduped = new Map();
+        for (const row of this.rawRows.slice(2)) {
+          const key = (row[keyIndex] ?? "").toString().trim();
+          if (!key) continue;
+          const filledCount = infoIndexes.reduce((count, idx) => {
+            const cell = (row[idx] ?? "").toString().trim();
+            return cell.length > 0 ? count + 1 : count;
+          }, 0);
+          const existing = deduped.get(key);
+          if (!existing || filledCount > existing.filledCount) {
+            deduped.set(key, { row, filledCount });
+          }
+        }
+        this.rawRows = [this.rawRows[0], this.rawRows[1], ...Array.from(deduped.values()).map((v) => v.row)];
+      }
 
       this.statusMessage = `총 ${Math.max(this.rawRows.length - 2, 0)}건 로드됨`;
     } catch (err) {
