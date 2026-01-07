@@ -2,7 +2,7 @@
 
 title: AptViewer
 description: 아파트 시세 summary 시트 뷰어
-baseurl: "/AptViewer"
+baseurl: ""
 
 plugins:
   - jekyll-feed
