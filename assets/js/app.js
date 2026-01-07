@@ -198,6 +198,13 @@ Vue.createApp({
       if (this.sortKey !== col.index) return "▲";
       return this.sortDir === "asc" ? "▲" : "▼";
     },
+    columnStyle(col) {
+      const normalized = col.normalized;
+      if (normalized === normalizeColumn("단지명")) {
+        return { width: "250px", minWidth: "250px" };
+      }
+      return {};
+    },
     resetFilters() {
       this.filters = {};
       this.openFilterKey = null;

@@ -38,6 +38,9 @@
 
     <section class="table-wrap">
         <table v-if="tableRows.length">
+          <colgroup>
+            <col v-for="col in visibleColumns" :key="col.index" :style="columnStyle(col)" />
+          </colgroup>
           <thead>
             <tr>
               <th
