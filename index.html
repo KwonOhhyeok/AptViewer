@@ -5,6 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>아파트 시세 분석</title>
   <link rel="icon" href="assets/img/aptviewer.png" type="image/png" />
+  <meta property="og:title" content="아파트 시세 분석" />
+  <meta property="og:description" content="아파트 시세 summary 시트 뷰어" />
+  <meta property="og:image" content="https://land.vivleap.com/assets/img/aptviewer.png" />
+  <meta property="og:image:alt" content="AptViewer 썸네일" />
   <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
   <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
   <link rel="stylesheet" href="assets/css/main.css" />
@@ -28,6 +32,14 @@
             :class="{ active: hideEmptyRows }"
           >
             빈 값 제거
+          </button>
+          <button
+            class="ghost-btn"
+            type="button"
+            @click="exportXlsx"
+            :disabled="!visibleRows.length"
+          >
+            엑셀로 내보내기
           </button>
           <button class="reset-btn" type="button" @click="resetFilters" aria-label="필터 초기화">
             <img class="reset-icon" src="assets/img/refresh.png" alt="" />
@@ -114,6 +126,7 @@
   </div>
 
   <script src="assets/js/config.js"></script>
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="assets/js/app.js"></script>
 </body>
 </html>

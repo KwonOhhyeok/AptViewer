@@ -211,6 +211,30 @@ Vue.createApp({
     },
     toggleHideEmptyRows() {
       this.hideEmptyRows = !this.hideEmptyRows;
+    },
+    exportXlsx() {
+      if (!window.XLSX) {
+        alert("xlsx 라이브러리를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");
+        return;
+      }
+      if (!this.visibleRows.length) {
+        alert("내보낼 데이터가 없습니다.");
+        return;
+      }
+      const sheetRows = [this.visibleHeaderRow, ...this.visibleRows];
+      const sheet = window.XLSX.utils.aoa_to_sheet(sheetRows);
+      const workbook = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(workbook, sheet, "AptViewer");
+      const now = new Date();
+      const stamp = [
+        now.getFullYear(),
+        String(now.getMonth() + 1).padStart(2, "0"),
+        String(now.getDate()).padStart(2, "0"),
+        "-",
+        String(now.getHours()).padStart(2, "0"),
+        String(now.getMinutes()).padStart(2, "0")
+      ].join("");
+      window.XLSX.writeFile(workbook, `aptviewer-export-${stamp}.xlsx`);
     }
   },
   async mounted() {

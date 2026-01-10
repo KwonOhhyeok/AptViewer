@@ -123,6 +123,11 @@ header {
   border-color: #c3d8c8;
 }
 
+.ghost-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .reset-btn:hover {
   background: #e8f1ea;
   color: var(--accent);
