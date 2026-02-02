@@ -358,12 +358,40 @@ Vue.createApp({
         return { width, minWidth: width };
       }
       if (
+        normalized === normalizeColumn("지역구") ||
+        normalized === normalizeColumn("생활권(동)")
+      ) {
+        const width = isCompact ? (isTiny ? "110px" : "120px") : "150px";
+        return { width, minWidth: width };
+      }
+      if (normalized === normalizeColumn("준공년월")) {
+        const width = isCompact ? (isTiny ? "95px" : "105px") : "125px";
+        return { width, minWidth: width };
+      }
+      if (
+        normalized === normalizeColumn("세대수") ||
+        normalized === normalizeColumn("공급평형") ||
+        normalized === normalizeColumn("전용면적") ||
+        normalized === normalizeColumn("전세갯수")
+      ) {
+        const width = isCompact ? (isTiny ? "90px" : "100px") : "115px";
+        return { width, minWidth: width };
+      }
+      if (
         normalized === normalizeColumn("매매가") ||
         normalized === normalizeColumn("전세가") ||
-        normalized === normalizeColumn("전세가율") ||
-        normalized === normalizeColumn("투자금")
+        normalized === normalizeColumn("전세가율")
       ) {
-        const width = isCompact ? (isTiny ? "100px" : "110px") : "130px";
+        const width = isCompact ? (isTiny ? "90px" : "100px") : "120px";
+        return { width, minWidth: width };
+      }
+      if (
+        normalized === normalizeColumn("투자금") ||
+        normalized === normalizeColumn("투자금(매-전)") ||
+        normalized === normalizeColumn("투자금(대출60%)") ||
+        normalized === normalizeColumn("투자금(대출40%)")
+      ) {
+        const width = isCompact ? (isTiny ? "95px" : "105px") : "125px";
         return { width, minWidth: width };
       }
       if (isCompact) {
@@ -424,13 +452,43 @@ Vue.createApp({
         .map((row) => row.map((cell) => (cell ?? "").toString().trim()))
         .filter((row) => row.some((cell) => cell.length > 0));
 
+      const baseLength = Math.max(
+        18,
+        ...cleaned.map((row) => row.length)
+      );
       this.rawRows = cleaned.map((row) => {
-        const padded = row.slice(0, 18);
-        while (padded.length < 18) padded.push("");
+        const padded = row.slice();
+        while (padded.length < baseLength) padded.push("");
         return padded;
       });
 
+      const computedNames = [
+        "투자금(대출60%)",
+        "투자금(대출40%)"
+      ];
+      const computedNormalized = computedNames.map(normalizeColumn);
       const headerRow = this.rawRows[1] || [];
+      const saleIndex = headerRow.findIndex(
+        (name) => normalizeColumn(name) === normalizeColumn("매매가")
+      );
+      const investIndex = headerRow.findIndex(
+        (name) => normalizeColumn(name) === normalizeColumn("투자금")
+      );
+      if (investIndex >= 0) {
+        headerRow[investIndex] = "투자금(매-전)";
+        const insertAt = investIndex + 1;
+        headerRow.splice(insertAt, 0, ...computedNames);
+        if (this.rawRows[0]) {
+          this.rawRows[0].splice(insertAt, 0, "", "");
+        }
+        for (const row of this.rawRows.slice(2)) {
+          const saleValue = saleIndex >= 0 ? parseNumber(row[saleIndex]) : null;
+          const loan60 = saleValue === null ? "" : Math.round(saleValue * 0.4);
+          const loan40 = saleValue === null ? "" : Math.round(saleValue * 0.6);
+          row.splice(insertAt, 0, loan60, loan40);
+        }
+      }
+
       const keyIndex = headerRow.findIndex(
         (name) => normalizeColumn(name) === normalizeColumn("단지접근키")
       );
@@ -444,7 +502,8 @@ Vue.createApp({
           .filter(
             (col) =>
               (col.group === "단지정보" || col.group === "시세") &&
-              !HIDDEN_COLUMNS.has(col.normalized)
+              !HIDDEN_COLUMNS.has(col.normalized) &&
+              !computedNormalized.includes(col.normalized)
           )
           .map((col) => col.index);
 

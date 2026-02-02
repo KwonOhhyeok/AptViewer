@@ -18,7 +18,16 @@ window.AptViewerConfig = (() => {
   );
 
   const NUMERIC_FILTER_COLUMNS = new Set(
-    ["세대수", "매매가", "전세가", "전세가율", "투자금"].map(normalizeColumn)
+    [
+      "세대수",
+      "매매가",
+      "전세가",
+      "전세가율",
+      "투자금",
+      "투자금(매-전)",
+      "투자금(대출60%)",
+      "투자금(대출40%)"
+    ].map(normalizeColumn)
   );
 
   const COLUMN_GROUPS = [
@@ -47,6 +56,9 @@ window.AptViewerConfig = (() => {
         "전세가",
         "전세가율",
         "투자금",
+        "투자금(매-전)",
+        "투자금(대출60%)",
+        "투자금(대출40%)",
         "전세갯수",
         "고점대비하락률"
       ]
