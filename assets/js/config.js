@@ -17,6 +17,10 @@ window.AptViewerConfig = (() => {
     ].map(normalizeColumn)
   );
 
+  const NUMERIC_FILTER_COLUMNS = new Set(
+    ["세대수", "매매가", "전세가", "전세가율", "투자금"].map(normalizeColumn)
+  );
+
   const COLUMN_GROUPS = [
     {
       title: "단지정보",
@@ -77,6 +81,7 @@ window.AptViewerConfig = (() => {
     REGION_IDX,
     normalizeColumn,
     HIDDEN_COLUMNS,
+    NUMERIC_FILTER_COLUMNS,
     COLUMN_GROUPS,
     getGroupTitle,
     buildCsvUrl,

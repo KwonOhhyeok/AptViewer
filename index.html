@@ -87,6 +87,66 @@
                     class="filter-menu"
                     @click.stop
                   >
+                    <template v-if="col.numeric">
+                      <div class="numeric-filter">
+                        <div class="numeric-row">
+                          <select
+                            class="numeric-select"
+                            :value="numericFilterState(col)[0].op"
+                            @change="handleNumericOpChange(col, 0, $event)"
+                          >
+                            <option
+                              v-for="option in numericFilterOptions"
+                              :key="option.value || 'default'"
+                              :value="option.value"
+                            >
+                              {{ option.label }}
+                            </option>
+                          </select>
+                          <input
+                            class="numeric-input"
+                            type="text"
+                            inputmode="decimal"
+                            placeholder="값 입력"
+                            :value="numericFilterState(col)[0].value"
+                            @input="handleNumericValueInput(col, 0, $event)"
+                          />
+                        </div>
+                        <div v-if="showSecondNumericRow(col)" class="numeric-row">
+                          <select
+                            class="numeric-select"
+                            :value="numericFilterState(col)[1].op"
+                            @change="handleNumericOpChange(col, 1, $event)"
+                          >
+                            <option
+                              v-for="option in numericFilterOptions"
+                              :key="option.value || 'default-2'"
+                              :value="option.value"
+                            >
+                              {{ option.label }}
+                            </option>
+                          </select>
+                          <input
+                            class="numeric-input"
+                            type="text"
+                            inputmode="decimal"
+                            placeholder="값 입력"
+                            :value="numericFilterState(col)[1].value"
+                            @input="handleNumericValueInput(col, 1, $event)"
+                          />
+                        </div>
+                      </div>
+                      <div class="numeric-actions">
+                        <button
+                          class="numeric-clear-btn"
+                          type="button"
+                          @click="clearNumericFilters(col)"
+                        >
+                          필터 해제
+                        </button>
+                      </div>
+                      <div class="filter-divider"></div>
+                    </template>
                     <label class="filter-item">
                       <input
                         type="checkbox"

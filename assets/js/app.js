@@ -2,11 +2,20 @@ const {
   REGION_IDX,
   normalizeColumn,
   HIDDEN_COLUMNS,
+  NUMERIC_FILTER_COLUMNS,
   COLUMN_GROUPS,
   getGroupTitle,
   buildCsvUrl,
   parseNumber
 } = window.AptViewerConfig;
+
+const NUMERIC_FILTER_OPTIONS = [
+  { label: "기본값: 항목 선택", value: "" },
+  { label: "보다 큼", value: "gt" },
+  { label: "보다 작음", value: "lt" },
+  { label: "크거나 같음", value: "gte" },
+  { label: "작거나 같음", value: "lte" }
+];
 
 Vue.createApp({
   data() {
@@ -14,6 +23,8 @@ Vue.createApp({
       rawRows: [],
       statusMessage: "데이터를 불러오는 중입니다...",
       filters: {},
+      numericFilters: {},
+      numericFilterOptions: NUMERIC_FILTER_OPTIONS,
       openFilterKey: null,
       sortKey: null,
       sortDir: "asc",
@@ -35,7 +46,11 @@ Vue.createApp({
           group: getGroupTitle(name),
           normalized: normalizeColumn(name)
         }))
-        .filter((col) => !HIDDEN_COLUMNS.has(col.normalized));
+        .filter((col) => !HIDDEN_COLUMNS.has(col.normalized))
+        .map((col) => ({
+          ...col,
+          numeric: NUMERIC_FILTER_COLUMNS.has(col.normalized)
+        }));
 
       const recentKey = normalizeColumn("최근수정일");
       const recentIndex = columns.findIndex((col) => col.normalized === recentKey);
@@ -124,6 +139,20 @@ Vue.createApp({
           const cell = (row[col.index] ?? "").toString().trim();
           if (!selected.includes(cell)) return false;
         }
+
+        for (const col of this.visibleColumns) {
+          if (!col.numeric) continue;
+          const activeFilters = this.activeNumericFilters(col);
+          if (!activeFilters.length) continue;
+          const cellValue = parseNumber(row[col.index]);
+          if (cellValue === null) return false;
+          for (const filter of activeFilters) {
+            const target = parseNumber(filter.value);
+            if (target === null) continue;
+            if (!this.compareNumeric(cellValue, target, filter.op)) return false;
+          }
+        }
+
         return true;
       });
     },
@@ -156,7 +185,88 @@ Vue.createApp({
       return this.columnValues[this.filterKey(col)] || [];
     },
     isFilterActive(col) {
-      return Array.isArray(this.filters[this.filterKey(col)]);
+      const key = this.filterKey(col);
+      return Array.isArray(this.filters[key]) || (col.numeric && this.hasActiveNumericFilters(col));
+    },
+    ensureNumericFilterState(col) {
+      const key = this.filterKey(col);
+      if (!this.numericFilters[key]) {
+        this.numericFilters[key] = [
+          { op: "", value: "" },
+          { op: "", value: "" }
+        ];
+      }
+      return this.numericFilters[key];
+    },
+    numericFilterState(col) {
+      return this.numericFilters[this.filterKey(col)] || [
+        { op: "", value: "" },
+        { op: "", value: "" }
+      ];
+    },
+    activeNumericFilters(col) {
+      const state = this.numericFilters[this.filterKey(col)];
+      if (!state) return [];
+      return state.filter((row) => this.isNumericRowActive(row));
+    },
+    hasActiveNumericFilters(col) {
+      return this.activeNumericFilters(col).length > 0;
+    },
+    isNumericRowActive(row) {
+      if (!row || !row.op) return false;
+      const value = (row.value ?? "").toString().trim();
+      if (!value) return false;
+      return parseNumber(value) !== null;
+    },
+    showSecondNumericRow(col) {
+      const [first, second] = this.numericFilterState(col);
+      return this.isNumericRowActive(first) || !!second?.op || !!second?.value;
+    },
+    handleNumericOpChange(col, index, event) {
+      const state = this.ensureNumericFilterState(col);
+      const op = event.target.value;
+      state[index].op = op;
+      if (!op) {
+        state[index].value = "";
+        if (index === 0) {
+          state[1] = { op: "", value: "" };
+        }
+      }
+      if (op) {
+        this.$nextTick(() => {
+          const row = event.target.closest(".numeric-row");
+          const input = row ? row.querySelector("input") : null;
+          if (input) input.focus();
+        });
+      }
+    },
+    handleNumericValueInput(col, index, event) {
+      const state = this.ensureNumericFilterState(col);
+      state[index].value = event.target.value;
+      if (index === 0 && !state[index].value.toString().trim()) {
+        state[1] = { op: "", value: "" };
+      }
+    },
+    clearNumericFilters(col) {
+      const key = this.filterKey(col);
+      this.numericFilters[key] = [
+        { op: "", value: "" },
+        { op: "", value: "" }
+      ];
+    },
+    compareNumeric(left, right, op) {
+      switch (op) {
+        case "gt":
+          return left > right;
+        case "lt":
+          return left < right;
+        case "gte":
+          return left >= right;
+        case "lte":
+          return left <= right;
+        default:
+          return true;
+      }
     },
     isAllSelected(col) {
       const key = this.filterKey(col);
@@ -189,7 +299,11 @@ Vue.createApp({
       else this.filters[key] = current;
     },
     toggleFilterMenu(col) {
-      this.openFilterKey = this.openFilterKey === col.index ? null : col.index;
+      const nextKey = this.openFilterKey === col.index ? null : col.index;
+      this.openFilterKey = nextKey;
+      if (nextKey !== null && col.numeric) {
+        this.ensureNumericFilterState(col);
+      }
     },
     toggleSort(col) {
       if (this.sortKey === col.index) {
@@ -211,10 +325,14 @@ Vue.createApp({
       if (normalized === normalizeColumn("단지명")) {
         return { width: "250px", minWidth: "250px" };
       }
+      if (normalized === normalizeColumn("최근수정일")) {
+        return { width: "180px", minWidth: "180px" };
+      }
       return {};
     },
     resetFilters() {
       this.filters = {};
+      this.numericFilters = {};
       this.openFilterKey = null;
     },
     toggleHideEmptyRows() {
