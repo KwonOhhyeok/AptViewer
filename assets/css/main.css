@@ -294,6 +294,16 @@ tbody tr:hover {
   z-index: 10;
 }
 
+.filter-menu.align-right {
+  left: auto;
+  right: 0;
+}
+
+.filter-menu.align-left {
+  left: 0;
+  right: auto;
+}
+
 .filter-item {
   display: flex;
   align-items: center;
@@ -403,5 +413,78 @@ tbody tr:hover {
 
   .table-wrap {
     border-radius: 14px;
+  }
+}
+
+@media (max-width: 720px) {
+  .page {
+    padding: 18px 14px 40px;
+  }
+
+  .title {
+    font-size: clamp(22px, 6vw, 30px);
+  }
+
+  .status-row {
+    gap: 12px;
+  }
+
+  .status-actions {
+    width: 100%;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+
+  .ghost-btn {
+    flex: 1 1 160px;
+  }
+
+  .reset-btn {
+    min-width: 44px;
+  }
+
+  .table-wrap {
+    overflow-x: auto;
+    overflow-y: visible;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  table {
+    min-width: 900px;
+  }
+
+  th,
+  td {
+    padding: 8px 10px;
+    font-size: 12px;
+  }
+
+  .filter-menu {
+    min-width: 220px;
+    max-width: calc(100vw - 28px);
+    left: 0;
+    right: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 16px 12px 36px;
+  }
+
+  .status {
+    font-size: 12px;
+  }
+
+  .ghost-btn {
+    flex: 1 1 100%;
+  }
+
+  table {
+    min-width: 760px;
+  }
+
+  .filter-menu {
+    right: 6px;
   }
 }

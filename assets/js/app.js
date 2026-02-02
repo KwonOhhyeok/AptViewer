@@ -25,6 +25,7 @@ Vue.createApp({
       filters: {},
       numericFilters: {},
       numericFilterOptions: NUMERIC_FILTER_OPTIONS,
+      viewportWidth: typeof window !== "undefined" ? window.innerWidth : 1024,
       openFilterKey: null,
       sortKey: null,
       sortDir: "asc",
@@ -304,6 +305,30 @@ Vue.createApp({
       if (nextKey !== null && col.numeric) {
         this.ensureNumericFilterState(col);
       }
+      if (nextKey !== null) {
+        this.adjustFilterMenuPosition();
+      }
+    },
+    adjustFilterMenuPosition() {
+      if (this.viewportWidth > 720) return;
+      this.$nextTick(() => {
+        const root =
+          this.$el && typeof this.$el.querySelector === "function" ? this.$el : document;
+        const menu = root.querySelector(".filter-menu");
+        if (!menu) return;
+        menu.style.transform = "";
+        const rect = menu.getBoundingClientRect();
+        const padding = 8;
+        let shiftX = 0;
+        if (rect.right > window.innerWidth - padding) {
+          shiftX = window.innerWidth - padding - rect.right;
+        } else if (rect.left < padding) {
+          shiftX = padding - rect.left;
+        }
+        if (shiftX !== 0) {
+          menu.style.transform = `translateX(${shiftX}px)`;
+        }
+      });
     },
     toggleSort(col) {
       if (this.sortKey === col.index) {
@@ -322,13 +347,33 @@ Vue.createApp({
     },
     columnStyle(col) {
       const normalized = col.normalized;
+      const isCompact = this.viewportWidth <= 720;
+      const isTiny = this.viewportWidth <= 480;
       if (normalized === normalizeColumn("단지명")) {
-        return { width: "250px", minWidth: "250px" };
+        const width = isCompact ? (isTiny ? "170px" : "190px") : "250px";
+        return { width, minWidth: width };
       }
       if (normalized === normalizeColumn("최근수정일")) {
-        return { width: "180px", minWidth: "180px" };
+        const width = isCompact ? (isTiny ? "120px" : "140px") : "180px";
+        return { width, minWidth: width };
+      }
+      if (
+        normalized === normalizeColumn("매매가") ||
+        normalized === normalizeColumn("전세가") ||
+        normalized === normalizeColumn("전세가율") ||
+        normalized === normalizeColumn("투자금")
+      ) {
+        const width = isCompact ? (isTiny ? "100px" : "110px") : "130px";
+        return { width, minWidth: width };
+      }
+      if (isCompact) {
+        const width = isTiny ? "96px" : "110px";
+        return { width, minWidth: width };
       }
       return {};
+    },
+    updateViewportWidth() {
+      this.viewportWidth = window.innerWidth;
     },
     resetFilters() {
       this.filters = {};
@@ -365,6 +410,7 @@ Vue.createApp({
   },
   async mounted() {
     document.addEventListener("click", this.closeFilterMenu);
+    window.addEventListener("resize", this.updateViewportWidth);
     const url = buildCsvUrl();
     if (!url) {
       this.statusMessage = "CSV URL 또는 SHEET_ID를 설정해주세요.";
@@ -426,5 +472,6 @@ Vue.createApp({
   },
   beforeUnmount() {
     document.removeEventListener("click", this.closeFilterMenu);
+    window.removeEventListener("resize", this.updateViewportWidth);
   }
 }).mount("#app");
