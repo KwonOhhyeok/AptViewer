@@ -9,7 +9,6 @@ window.AptViewerConfig = (() => {
 
   const HIDDEN_COLUMNS = new Set(
     [
-      "최근수정일",
       "단지접근키",
       "구조",
       "전고점",

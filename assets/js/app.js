@@ -28,7 +28,7 @@ Vue.createApp({
       return this.rawRows.slice(2);
     },
     visibleColumns() {
-      return this.headerRow
+      const columns = this.headerRow
         .map((name, index) => ({
           name,
           index,
@@ -36,6 +36,14 @@ Vue.createApp({
           normalized: normalizeColumn(name)
         }))
         .filter((col) => !HIDDEN_COLUMNS.has(col.normalized));
+
+      const recentKey = normalizeColumn("최근수정일");
+      const recentIndex = columns.findIndex((col) => col.normalized === recentKey);
+      if (recentIndex > 0) {
+        const [recentCol] = columns.splice(recentIndex, 1);
+        columns.unshift(recentCol);
+      }
+      return columns;
     },
     visibleHeaderRow() {
       return this.visibleColumns.map((col) => col.name);
