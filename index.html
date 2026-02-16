@@ -65,12 +65,12 @@
               </th>
             </tr>
             <tr>
-              <th v-for="col in visibleColumns" :key="col.index">
+              <th v-for="col in visibleColumns" :key="col.index" :data-col-index="col.index">
                 <div class="col-head">
                   <span
                     class="col-title"
                     :class="{ active: isFilterActive(col) }"
-                    @click.stop="toggleFilterMenu(col)"
+                    @click.stop="toggleFilterMenu(col, $event)"
                   >
                     {{ col.name }}
                   </span>
@@ -84,7 +84,8 @@
                   </button>
                   <div
                     v-if="openFilterKey === col.index"
-                    class="filter-menu"
+                    class="filter-menu is-open"
+                    :style="filterMenuStyle"
                     @click.stop
                   >
                     <template v-if="col.numeric">

@@ -20,6 +20,7 @@ window.AptViewerConfig = (() => {
   const NUMERIC_FILTER_COLUMNS = new Set(
     [
       "세대수",
+      "전용면적",
       "매매가",
       "전세가",
       "전세가율",

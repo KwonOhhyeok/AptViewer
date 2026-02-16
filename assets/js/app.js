@@ -27,6 +27,7 @@ Vue.createApp({
       numericFilterOptions: NUMERIC_FILTER_OPTIONS,
       viewportWidth: typeof window !== "undefined" ? window.innerWidth : 1024,
       openFilterKey: null,
+      filterMenuStyle: {},
       sortKey: null,
       sortDir: "asc",
       hideEmptyRows: false
@@ -238,6 +239,7 @@ Vue.createApp({
           const row = event.target.closest(".numeric-row");
           const input = row ? row.querySelector("input") : null;
           if (input) input.focus();
+          this.repositionOpenFilterMenu();
         });
       }
     },
@@ -299,35 +301,67 @@ Vue.createApp({
       if (current.length === values.length) delete this.filters[key];
       else this.filters[key] = current;
     },
-    toggleFilterMenu(col) {
+    toggleFilterMenu(col, event) {
       const nextKey = this.openFilterKey === col.index ? null : col.index;
       this.openFilterKey = nextKey;
-      if (nextKey !== null && col.numeric) {
+      if (nextKey === null) {
+        this.filterMenuStyle = {};
+        return;
+      }
+      if (col.numeric) {
         this.ensureNumericFilterState(col);
       }
-      if (nextKey !== null) {
-        this.adjustFilterMenuPosition();
-      }
+      this.adjustFilterMenuPosition(col, event);
     },
-    adjustFilterMenuPosition() {
-      if (this.viewportWidth > 720) return;
+    repositionOpenFilterMenu() {
+      if (this.openFilterKey === null) return;
+      const col = this.visibleColumns.find((item) => item.index === this.openFilterKey);
+      if (!col) return;
+      this.adjustFilterMenuPosition(col);
+    },
+    adjustFilterMenuPosition(col, event) {
       this.$nextTick(() => {
         const root =
           this.$el && typeof this.$el.querySelector === "function" ? this.$el : document;
-        const menu = root.querySelector(".filter-menu");
+        const menu = root.querySelector(".filter-menu.is-open");
         if (!menu) return;
-        menu.style.transform = "";
-        const rect = menu.getBoundingClientRect();
+        const anchor =
+          event?.currentTarget ||
+          root.querySelector(`th[data-col-index="${col.index}"] .col-title`);
+        if (!anchor) return;
+
+        const anchorRect = anchor.getBoundingClientRect();
         const padding = 8;
-        let shiftX = 0;
-        if (rect.right > window.innerWidth - padding) {
-          shiftX = window.innerWidth - padding - rect.right;
-        } else if (rect.left < padding) {
-          shiftX = padding - rect.left;
-        }
-        if (shiftX !== 0) {
-          menu.style.transform = `translateX(${shiftX}px)`;
-        }
+        let left = anchorRect.left;
+        let top = anchorRect.bottom + 6;
+        this.filterMenuStyle = {
+          left: `${left}px`,
+          top: `${top}px`
+        };
+
+        requestAnimationFrame(() => {
+          const rect = menu.getBoundingClientRect();
+          if (rect.right > window.innerWidth - padding) {
+            left -= rect.right - (window.innerWidth - padding);
+          }
+          if (left < padding) {
+            left = padding;
+          }
+
+          if (rect.height >= window.innerHeight - padding * 2) {
+            top = padding;
+          } else if (top + rect.height > window.innerHeight - padding) {
+            top = window.innerHeight - padding - rect.height;
+          }
+          if (top < padding) {
+            top = padding;
+          }
+
+          this.filterMenuStyle = {
+            left: `${left}px`,
+            top: `${top}px`
+          };
+        });
       });
     },
     toggleSort(col) {
@@ -339,7 +373,10 @@ Vue.createApp({
       }
     },
     closeFilterMenu(event) {
-      if (!this.$el.contains(event.target)) this.openFilterKey = null;
+      if (!this.$el.contains(event.target)) {
+        this.openFilterKey = null;
+        this.filterMenuStyle = {};
+      }
     },
     sortIcon(col) {
       if (this.sortKey !== col.index) return "▲";
@@ -402,11 +439,13 @@ Vue.createApp({
     },
     updateViewportWidth() {
       this.viewportWidth = window.innerWidth;
+      this.repositionOpenFilterMenu();
     },
     resetFilters() {
       this.filters = {};
       this.numericFilters = {};
       this.openFilterKey = null;
+      this.filterMenuStyle = {};
     },
     toggleHideEmptyRows() {
       this.hideEmptyRows = !this.hideEmptyRows;
