@@ -178,6 +178,9 @@
             <tr v-for="(row, idx) in visibleRows" :key="idx">
               <td v-for="(cell, cellIdx) in row" :key="cellIdx">{{ cell }}</td>
             </tr>
+            <tr v-if="!visibleRows.length" class="empty-result-row">
+              <td :colspan="visibleColumns.length">필터 결과가 없습니다.</td>
+            </tr>
           </tbody>
         </table>
         <div v-else class="empty">

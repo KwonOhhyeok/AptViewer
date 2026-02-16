@@ -28,6 +28,7 @@ Vue.createApp({
       viewportWidth: typeof window !== "undefined" ? window.innerWidth : 1024,
       openFilterKey: null,
       filterMenuStyle: {},
+      tableWrapEl: null,
       sortKey: null,
       sortDir: "asc",
       hideEmptyRows: false
@@ -114,7 +115,8 @@ Vue.createApp({
       for (const col of this.visibleColumns) {
         const key = col.normalized;
         const bucket = new Map();
-        for (const row of this.tableRows) {
+        for (const row of this.sortedRows) {
+          if (!this.rowMatchesFiltersForOptions(row, key)) continue;
           const cell = (row[col.index] ?? "").toString().trim();
           const label = cell || "(빈값)";
           if (!bucket.has(cell)) bucket.set(cell, label);
@@ -180,6 +182,56 @@ Vue.createApp({
     }
   },
   methods: {
+    rowMatchesFiltersForOptions(row, excludeKey) {
+      if (this.hideEmptyRows) {
+        const hasEmpty = this.visibleColumns.some((col) => {
+          const cell = (row[col.index] ?? "").toString().trim();
+          return cell.length === 0 && col.normalized !== normalizeColumn("전세갯수");
+        });
+        if (hasEmpty) return false;
+      }
+
+      for (const col of this.visibleColumns) {
+        const key = col.normalized;
+        if (key === excludeKey) continue;
+        const selected = this.filters[key];
+        if (!selected) continue;
+        const cell = (row[col.index] ?? "").toString().trim();
+        if (!selected.includes(cell)) return false;
+      }
+
+      for (const col of this.visibleColumns) {
+        if (!col.numeric) continue;
+        const key = col.normalized;
+        if (key === excludeKey) continue;
+        const activeFilters = this.activeNumericFilters(col);
+        if (!activeFilters.length) continue;
+        const cellValue = parseNumber(row[col.index]);
+        if (cellValue === null) return false;
+        for (const filter of activeFilters) {
+          const target = parseNumber(filter.value);
+          if (target === null) continue;
+          if (!this.compareNumeric(cellValue, target, filter.op)) return false;
+        }
+      }
+
+      return true;
+    },
+    syncFiltersToAvailableOptions() {
+      for (const col of this.visibleColumns) {
+        const key = this.filterKey(col);
+        const selected = this.filters[key];
+        if (!Array.isArray(selected)) continue;
+
+        const availableValues = this.columnValuesFor(col).map((item) => item.value);
+        const availableSet = new Set(availableValues);
+        const normalizedSelection = selected.filter((value) => availableSet.has(value));
+
+        if (normalizedSelection.length !== selected.length) {
+          this.filters[key] = normalizedSelection;
+        }
+      }
+    },
     filterKey(col) {
       return col.normalized;
     },
@@ -242,6 +294,7 @@ Vue.createApp({
           this.repositionOpenFilterMenu();
         });
       }
+      this.syncFiltersToAvailableOptions();
     },
     handleNumericValueInput(col, index, event) {
       const state = this.ensureNumericFilterState(col);
@@ -249,6 +302,7 @@ Vue.createApp({
       if (index === 0 && !state[index].value.toString().trim()) {
         state[1] = { op: "", value: "" };
       }
+      this.syncFiltersToAvailableOptions();
     },
     clearNumericFilters(col) {
       const key = this.filterKey(col);
@@ -256,6 +310,7 @@ Vue.createApp({
         { op: "", value: "" },
         { op: "", value: "" }
       ];
+      this.syncFiltersToAvailableOptions();
     },
     compareNumeric(left, right, op) {
       switch (op) {
@@ -290,18 +345,24 @@ Vue.createApp({
       } else {
         this.filters[key] = [];
       }
+      this.syncFiltersToAvailableOptions();
     },
     toggleValue(col, value) {
       const key = this.filterKey(col);
       const values = this.columnValuesFor(col).map((item) => item.value);
-      const current = this.filters[key] ? [...this.filters[key]] : [...values];
+      const valueSet = new Set(values);
+      const current = this.filters[key]
+        ? this.filters[key].filter((item) => valueSet.has(item))
+        : [...values];
       const idx = current.indexOf(value);
       if (idx >= 0) current.splice(idx, 1);
       else current.push(value);
       if (current.length === values.length) delete this.filters[key];
       else this.filters[key] = current;
+      this.syncFiltersToAvailableOptions();
     },
     toggleFilterMenu(col, event) {
+      this.syncFiltersToAvailableOptions();
       const nextKey = this.openFilterKey === col.index ? null : col.index;
       this.openFilterKey = nextKey;
       if (nextKey === null) {
@@ -478,6 +539,11 @@ Vue.createApp({
   async mounted() {
     document.addEventListener("click", this.closeFilterMenu);
     window.addEventListener("resize", this.updateViewportWidth);
+    window.addEventListener("scroll", this.repositionOpenFilterMenu, true);
+    this.tableWrapEl = this.$el?.querySelector?.(".table-wrap") || null;
+    if (this.tableWrapEl) {
+      this.tableWrapEl.addEventListener("scroll", this.repositionOpenFilterMenu);
+    }
     const url = buildCsvUrl();
     if (!url) {
       this.statusMessage = "CSV URL 또는 SHEET_ID를 설정해주세요.";
@@ -571,5 +637,9 @@ Vue.createApp({
   beforeUnmount() {
     document.removeEventListener("click", this.closeFilterMenu);
     window.removeEventListener("resize", this.updateViewportWidth);
+    window.removeEventListener("scroll", this.repositionOpenFilterMenu, true);
+    if (this.tableWrapEl) {
+      this.tableWrapEl.removeEventListener("scroll", this.repositionOpenFilterMenu);
+    }
   }
 }).mount("#app");
