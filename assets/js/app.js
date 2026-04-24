@@ -511,6 +511,23 @@ Vue.createApp({
     toggleHideEmptyRows() {
       this.hideEmptyRows = !this.hideEmptyRows;
     },
+    tdClass(col) {
+      if (!col) return "";
+      const n = col.normalized;
+      if (n === "최근수정일") return "cell-date";
+      if (n === "지역구") return "cell-region";
+      if (n === "단지명") return "cell-name";
+      if (n === "준공년월" || n === "공급평형" || n === "공급평형" ) return "cell-center";
+      if (n === "전용면적") return "cell-center";
+      if (n === "세대수") return "cell-right";
+      if (n === "전세갯수") return "cell-count";
+      if (n === "매매가") return "cell-sale cell-right";
+      if (n === "전세가") return "cell-jeonse cell-right";
+      if (n === "전세가율") return "cell-rate";
+      if (n === "투자금(매-전)") return "cell-gap cell-right";
+      if (n === "투자금(대출60%)" || n === "투자금(대출40%)") return "cell-invest cell-right";
+      return "";
+    },
     exportXlsx() {
       if (!window.XLSX) {
         alert("xlsx 라이브러리를 불러오지 못했습니다. 잠시 후 다시 시도해주세요.");

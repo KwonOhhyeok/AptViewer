@@ -3,52 +3,208 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>아파트 시세 분석</title>
+  <title>Urban Pulse - 부동산 데이터 분석</title>
   <link rel="icon" href="assets/img/aptviewer.png" type="image/png" />
   <meta property="og:title" content="아파트 시세 분석" />
   <meta property="og:description" content="아파트 시세 summary 시트 뷰어" />
   <meta property="og:image" content="https://land.vivleap.com/assets/img/aptviewer.png" />
   <meta property="og:image:alt" content="AptViewer 썸네일" />
-  <script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
-  <script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+
+  <script src="https://cdn.tailwindcss.com?plugins=forms"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Inter:wght@600;700&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            "primary":                  "#451ebb",
+            "primary-container":        "#5d3fd3",
+            "primary-fixed":            "#e6deff",
+            "primary-fixed-dim":        "#cabeff",
+            "on-primary":               "#ffffff",
+            "on-primary-container":     "#d8ceff",
+            "on-primary-fixed-variant": "#4723be",
+            "secondary":                "#506600",
+            "secondary-container":      "#c1f100",
+            "secondary-fixed-dim":      "#abd600",
+            "on-secondary-container":   "#546b00",
+            "on-secondary-fixed":       "#161e00",
+            "tertiary-container":       "#006859",
+            "tertiary-fixed":           "#26fedc",
+            "on-tertiary-fixed":        "#00201a",
+            "error":                    "#ba1a1a",
+            "surface":                  "#fcf8f9",
+            "surface-container-high":   "#eae7e8",
+            "surface-container-lowest": "#ffffff",
+            "on-surface":               "#1b1b1c",
+            "on-surface-variant":       "#484554",
+            "outline":                  "#797586",
+            "outline-variant":          "#c9c4d7",
+          }
+        }
+      }
+    }
+  </script>
+
   <link rel="stylesheet" href="assets/css/main.css" />
 </head>
-<body>
-  <div id="app" class="page">
-    <header>
-      <div class="title-row">
-        <h1 class="title">아파트 시세 분석</h1>
+<body class="bg-surface text-on-surface">
+<div id="app">
+
+  <!-- ── Desktop Sidebar ─────────────────────────────────────── -->
+  <aside class="hidden md:flex fixed left-0 top-0 h-screen w-64 p-6 flex-col justify-between bg-white border-r border-slate-100 z-50">
+    <div>
+      <div class="text-2xl font-black tracking-tighter text-primary mb-8">Urban Pulse</div>
+      <nav class="space-y-1">
+        <a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-50 rounded-lg transition-all group" href="#">
+          <span class="material-symbols-outlined group-hover:text-primary">dashboard</span>
+          <span class="font-medium text-sm">홈</span>
+        </a>
+        <a class="flex items-center gap-3 bg-purple-50 text-primary rounded-lg px-4 py-3 font-bold" href="#">
+          <span class="material-symbols-outlined">analytics</span>
+          <span class="font-medium text-sm">시세 분석</span>
+        </a>
+        <a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-50 rounded-lg transition-all group" href="#">
+          <span class="material-symbols-outlined group-hover:text-primary">map</span>
+          <span class="font-medium text-sm">매물 지도</span>
+        </a>
+        <a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-50 rounded-lg transition-all group" href="#">
+          <span class="material-symbols-outlined group-hover:text-primary">favorite</span>
+          <span class="font-medium text-sm">관심 목록</span>
+        </a>
+        <a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-50 rounded-lg transition-all group" href="#">
+          <span class="material-symbols-outlined group-hover:text-primary">group</span>
+          <span class="font-medium text-sm">커뮤니티</span>
+        </a>
+      </nav>
+    </div>
+    <div class="space-y-4">
+      <button
+        class="w-full py-3 px-4 bg-primary text-white rounded-xl font-bold text-sm shadow-lg active:scale-[0.98] transition-transform"
+        @click="exportXlsx"
+        :disabled="!visibleRows.length"
+      >
+        데이터 추출
+      </button>
+      <div class="pt-4 border-t border-slate-100">
+        <a class="flex items-center gap-3 text-slate-500 px-4 py-3 hover:bg-slate-50 rounded-lg transition-all" href="#">
+          <span class="material-symbols-outlined">settings</span>
+          <span class="font-medium text-sm">설정</span>
+        </a>
       </div>
-      <div class="status-row" v-if="statusMessage">
-        <div class="status">
-          <span class="status-dot"></span>
-          <span>{{ statusMessage }}</span>
+    </div>
+  </aside>
+
+  <!-- ── Desktop Top Bar ─────────────────────────────────────── -->
+  <header class="hidden md:flex fixed top-0 right-0 left-64 h-16 items-center justify-between px-8 bg-white/70 backdrop-blur-lg border-b border-slate-100 z-40">
+    <div class="flex items-center bg-slate-50 px-4 py-2 rounded-full w-80 border border-slate-100">
+      <span class="material-symbols-outlined text-slate-400 mr-2 text-[20px]">search</span>
+      <input class="bg-transparent text-sm w-full outline-none placeholder:text-slate-400" placeholder="지역, 아파트명 검색" type="text"/>
+    </div>
+    <div class="flex items-center gap-3">
+      <button
+        class="flex items-center gap-1.5 px-3 py-2 rounded-lg text-sm font-semibold transition-colors border"
+        :class="hideEmptyRows
+          ? 'bg-primary-fixed text-primary border-primary-fixed-dim'
+          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'"
+        @click="toggleHideEmptyRows"
+      >
+        <span class="material-symbols-outlined text-[18px]">filter_alt</span>
+        빈 값 제거
+      </button>
+      <button
+        class="flex items-center gap-1.5 px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors text-slate-600"
+        @click="resetFilters"
+      >
+        <span class="material-symbols-outlined text-[18px]">refresh</span>
+        초기화
+      </button>
+      <div class="w-px h-6 bg-slate-200 mx-1"></div>
+      <div class="flex items-center gap-2">
+        <div class="text-right">
+          <p class="text-xs font-bold text-on-surface">실시간 데이터</p>
+          <p class="text-[10px] text-slate-400" v-if="statusMessage">{{ statusMessage }}</p>
         </div>
-        <div class="status-actions">
+        <div class="w-9 h-9 rounded-full bg-primary flex items-center justify-center text-white font-black text-xs">UP</div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ── Mobile Top Bar ─────────────────────────────────────── -->
+  <header class="md:hidden fixed top-0 left-0 w-full z-50 bg-white/90 backdrop-blur-xl border-b border-slate-100 flex justify-between items-center px-5 h-16 shadow-sm">
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-primary text-[22px]">analytics</span>
+      <h1 class="font-black text-lg tracking-tighter text-primary">Urban Pulse</h1>
+    </div>
+    <div class="flex items-center gap-3">
+      <span v-if="statusMessage" class="text-[11px] text-slate-400 font-medium">{{ statusMessage }}</span>
+      <div class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white font-black text-[10px]">UP</div>
+    </div>
+  </header>
+
+  <!-- ── Main Content ────────────────────────────────────────── -->
+  <main class="md:ml-64 pt-20 md:pt-24 pb-32 md:pb-12 px-4 md:px-8">
+
+    <!-- Page Header -->
+    <div class="mb-5 md:mb-8">
+      <div class="flex flex-col md:flex-row md:justify-between md:items-end gap-3 md:gap-0">
+        <div>
+          <h1 class="text-[22px] md:text-[32px] font-bold tracking-tight text-on-surface leading-tight">아파트 시세 분석</h1>
+          <p class="text-slate-500 mt-1 text-sm">실시간 거래 데이터 기반 서울·수도권 시장 현황</p>
+        </div>
+        <!-- Desktop action buttons (in top bar on desktop, shown here on mobile) -->
+        <div class="flex md:hidden gap-2 overflow-x-auto pb-1 no-scrollbar">
           <button
-            class="ghost-btn"
-            type="button"
+            class="flex items-center gap-1.5 px-4 py-2 rounded-full font-bold text-xs whitespace-nowrap active:scale-95 transition-all border"
+            :class="hideEmptyRows
+              ? 'bg-primary text-white border-primary shadow-md'
+              : 'bg-white border-slate-200 text-slate-600'"
             @click="toggleHideEmptyRows"
-            :class="{ active: hideEmptyRows }"
           >
+            <span class="material-symbols-outlined" style="font-size:14px;">filter_alt</span>
             빈 값 제거
           </button>
           <button
-            class="ghost-btn"
-            type="button"
+            class="flex items-center gap-1.5 px-4 py-2 bg-white border border-slate-200 text-slate-600 rounded-full font-bold text-xs whitespace-nowrap active:scale-95 transition-all"
+            @click="resetFilters"
+          >
+            <span class="material-symbols-outlined" style="font-size:14px;">refresh</span>
+            초기화
+          </button>
+          <button
+            class="flex items-center gap-1.5 px-4 py-2 bg-primary text-white rounded-full font-bold text-xs whitespace-nowrap shadow-md active:scale-95 transition-all"
             @click="exportXlsx"
             :disabled="!visibleRows.length"
           >
-            엑셀로 내보내기
-          </button>
-          <button class="reset-btn" type="button" @click="resetFilters" aria-label="필터 초기화">
-            <img class="reset-icon" src="assets/img/refresh.png" alt="" />
+            <span class="material-symbols-outlined" style="font-size:14px;">download</span>
+            추출
           </button>
         </div>
       </div>
-    </header>
+    </div>
 
-    <section class="table-wrap">
+    <!-- Table Card -->
+    <div class="bg-white rounded-2xl md:rounded-3xl border border-slate-100 overflow-hidden" style="box-shadow: 0 10px 40px rgba(0,0,0,0.03);">
+
+      <!-- Table Card Header -->
+      <div class="px-5 md:px-8 py-4 md:py-5 border-b border-slate-100 flex justify-between items-center bg-slate-50/50">
+        <h2 class="font-bold text-sm md:text-base text-on-surface">시장 분석 상세 데이터</h2>
+        <div class="flex gap-4">
+          <span class="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+            <span class="w-2 h-2 bg-primary rounded-full"></span>
+            <span class="hidden sm:inline">매매가</span>
+          </span>
+          <span class="flex items-center gap-1.5 text-xs font-semibold text-slate-400">
+            <span class="w-2 h-2 rounded-full" style="background:#abd600;"></span>
+            <span class="hidden sm:inline">전세가</span>
+          </span>
+        </div>
+      </div>
+
+      <!-- Scrollable table -->
+      <div class="table-wrap">
         <table v-if="tableRows.length">
           <colgroup>
             <col v-for="col in visibleColumns" :key="col.index" :style="columnStyle(col)" />
@@ -60,9 +216,7 @@
                 :key="group.title"
                 :colspan="group.colspan"
                 :data-group="group.title"
-              >
-                {{ group.title }}
-              </th>
+              >{{ group.title }}</th>
             </tr>
             <tr>
               <th v-for="col in visibleColumns" :key="col.index" :data-col-index="col.index">
@@ -71,17 +225,13 @@
                     class="col-title"
                     :class="{ active: isFilterActive(col) }"
                     @click.stop="toggleFilterMenu(col, $event)"
-                  >
-                    {{ col.name }}
-                  </span>
+                  >{{ col.name }}</span>
                   <button
                     class="icon-btn sort-indicator"
                     :class="{ active: sortKey === col.index }"
                     @click.stop="toggleSort(col)"
                     type="button"
-                  >
-                    {{ sortIcon(col) }}
-                  </button>
+                  >{{ sortIcon(col) }}</button>
                   <div
                     v-if="openFilterKey === col.index"
                     class="filter-menu is-open"
@@ -91,82 +241,30 @@
                     <template v-if="col.numeric">
                       <div class="numeric-filter">
                         <div class="numeric-row">
-                          <select
-                            class="numeric-select"
-                            :value="numericFilterState(col)[0].op"
-                            @change="handleNumericOpChange(col, 0, $event)"
-                          >
-                            <option
-                              v-for="option in numericFilterOptions"
-                              :key="option.value || 'default'"
-                              :value="option.value"
-                            >
-                              {{ option.label }}
-                            </option>
+                          <select class="numeric-select" :value="numericFilterState(col)[0].op" @change="handleNumericOpChange(col, 0, $event)">
+                            <option v-for="option in numericFilterOptions" :key="option.value || 'default'" :value="option.value">{{ option.label }}</option>
                           </select>
-                          <input
-                            class="numeric-input"
-                            type="text"
-                            inputmode="decimal"
-                            placeholder="값 입력"
-                            :value="numericFilterState(col)[0].value"
-                            @input="handleNumericValueInput(col, 0, $event)"
-                          />
+                          <input class="numeric-input" type="text" inputmode="decimal" placeholder="값 입력" :value="numericFilterState(col)[0].value" @input="handleNumericValueInput(col, 0, $event)" />
                         </div>
                         <div v-if="showSecondNumericRow(col)" class="numeric-row">
-                          <select
-                            class="numeric-select"
-                            :value="numericFilterState(col)[1].op"
-                            @change="handleNumericOpChange(col, 1, $event)"
-                          >
-                            <option
-                              v-for="option in numericFilterOptions"
-                              :key="option.value || 'default-2'"
-                              :value="option.value"
-                            >
-                              {{ option.label }}
-                            </option>
+                          <select class="numeric-select" :value="numericFilterState(col)[1].op" @change="handleNumericOpChange(col, 1, $event)">
+                            <option v-for="option in numericFilterOptions" :key="option.value || 'default-2'" :value="option.value">{{ option.label }}</option>
                           </select>
-                          <input
-                            class="numeric-input"
-                            type="text"
-                            inputmode="decimal"
-                            placeholder="값 입력"
-                            :value="numericFilterState(col)[1].value"
-                            @input="handleNumericValueInput(col, 1, $event)"
-                          />
+                          <input class="numeric-input" type="text" inputmode="decimal" placeholder="값 입력" :value="numericFilterState(col)[1].value" @input="handleNumericValueInput(col, 1, $event)" />
                         </div>
                       </div>
                       <div class="numeric-actions">
-                        <button
-                          class="numeric-clear-btn"
-                          type="button"
-                          @click="clearNumericFilters(col)"
-                        >
-                          필터 해제
-                        </button>
+                        <button class="numeric-clear-btn" type="button" @click="clearNumericFilters(col)">필터 해제</button>
                       </div>
                       <div class="filter-divider"></div>
                     </template>
                     <label class="filter-item">
-                      <input
-                        type="checkbox"
-                        :checked="isAllSelected(col)"
-                        @change="toggleAll(col, $event)"
-                      />
+                      <input type="checkbox" :checked="isAllSelected(col)" @change="toggleAll(col, $event)" />
                       <span>전체</span>
                     </label>
                     <div class="filter-divider"></div>
-                    <label
-                      v-for="item in columnValuesFor(col)"
-                      :key="item.value"
-                      class="filter-item"
-                    >
-                      <input
-                        type="checkbox"
-                        :checked="isValueChecked(col, item.value)"
-                        @change="toggleValue(col, item.value)"
-                      />
+                    <label v-for="item in columnValuesFor(col)" :key="item.value" class="filter-item">
+                      <input type="checkbox" :checked="isValueChecked(col, item.value)" @change="toggleValue(col, item.value)" />
                       <span>{{ item.label }}</span>
                     </label>
                   </div>
@@ -176,7 +274,7 @@
           </thead>
           <tbody>
             <tr v-for="(row, idx) in visibleRows" :key="idx">
-              <td v-for="(cell, cellIdx) in row" :key="cellIdx">{{ cell }}</td>
+              <td v-for="(cell, cellIdx) in row" :key="cellIdx" :class="tdClass(visibleColumns[cellIdx])">{{ cell }}</td>
             </tr>
             <tr v-if="!visibleRows.length" class="empty-result-row">
               <td :colspan="visibleColumns.length">필터 결과가 없습니다.</td>
@@ -184,13 +282,44 @@
           </tbody>
         </table>
         <div v-else class="empty">
+          <span class="material-symbols-outlined" style="font-size:40px; display:block; margin-bottom:12px; color:#c9c4d7;">hourglass_empty</span>
           <p>데이터가 없습니다. 스프레드시트 URL 설정을 확인해주세요.</p>
         </div>
-    </section>
-  </div>
+      </div>
+    </div>
 
-  <script src="assets/js/config.js"></script>
-  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script src="assets/js/app.js"></script>
+  </main>
+
+  <!-- ── Mobile Bottom Nav ───────────────────────────────────── -->
+  <nav class="md:hidden fixed bottom-0 left-0 w-full flex justify-around items-center px-4 pt-3 pb-6 bg-white/90 backdrop-blur-2xl z-50 border-t border-slate-100" style="border-radius: 24px 24px 0 0; box-shadow: 0 -10px 30px rgba(0,0,0,0.04);">
+    <a class="flex flex-col items-center gap-0.5 text-slate-400 active:scale-90 transition-all" href="#">
+      <span class="material-symbols-outlined">home</span>
+      <span class="text-[10px] font-semibold">Home</span>
+    </a>
+    <a class="flex flex-col items-center gap-0.5 text-primary scale-110" href="#">
+      <span class="material-symbols-outlined">analytics</span>
+      <span class="text-[10px] font-semibold">Market</span>
+    </a>
+    <a class="flex flex-col items-center gap-0.5 text-slate-400 active:scale-90 transition-all" href="#">
+      <span class="material-symbols-outlined">search</span>
+      <span class="text-[10px] font-semibold">Search</span>
+    </a>
+    <a class="flex flex-col items-center gap-0.5 text-slate-400 active:scale-90 transition-all" href="#">
+      <span class="material-symbols-outlined">favorite</span>
+      <span class="text-[10px] font-semibold">Saved</span>
+    </a>
+    <a class="flex flex-col items-center gap-0.5 text-slate-400 active:scale-90 transition-all" href="#">
+      <span class="material-symbols-outlined">person</span>
+      <span class="text-[10px] font-semibold">Profile</span>
+    </a>
+  </nav>
+
+</div>
+
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<script src="https://unpkg.com/papaparse@5.4.1/papaparse.min.js"></script>
+<script src="assets/js/config.js"></script>
+<script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="assets/js/app.js"></script>
 </body>
 </html>
