@@ -27,6 +27,7 @@ Vue.createApp({
       numericFilterOptions: NUMERIC_FILTER_OPTIONS,
       viewportWidth: typeof window !== "undefined" ? window.innerWidth : 1024,
       openFilterKey: null,
+      openFilterSource: null,
       filterMenuStyle: {},
       tableWrapEl: null,
       sortKey: null,
@@ -239,14 +240,27 @@ Vue.createApp({
     },
     filterChips() {
       const chipDefs = [
-        { label: "평형", colName: "공급평형" },
+        { label: "지역구", colName: "지역구" },
+        { label: "생활권", colName: "생활권(동)" },
+        { label: "준공년월", colName: "준공년월" },
+        { label: "세대수", colName: "세대수" },
+        { label: "공급 평형", colName: "공급 평형" },
+        { label: "전용 면적", colName: "전용 면적" },
+        { label: "매매가", colName: "매매가" },
+        { label: "전세가", colName: "전세가" },
         { label: "전세가율", colName: "전세가율" },
-        { label: "지역구", colName: "지역구" }
+        { label: "투자금(매-전)", colName: "투자금(매-전)" },
+        { label: "투자금(대출60%)", colName: "투자금(대출60%)" },
+        { label: "투자금(대출40%)", colName: "투자금(대출40%)" }
       ];
       return chipDefs.map(({ label, colName }) => {
         const col = this.visibleColumns.find(c => c.normalized === normalizeColumn(colName));
         return { name: label, col: col || null };
       }).filter(c => c.col);
+    },
+    openFilterColumn() {
+      if (this.openFilterKey === null) return null;
+      return this.visibleColumns.find((col) => col.index === this.openFilterKey) || null;
     },
     mobileCards() {
       const p = name => this.visibleColumns.findIndex(c => c.normalized === normalizeColumn(name));
@@ -367,6 +381,92 @@ Vue.createApp({
       const [first, second] = this.numericFilterState(col);
       return this.isNumericRowActive(first) || !!second?.op || !!second?.value;
     },
+    isRangeSliderColumn(col) {
+      if (!col) return false;
+      return [
+        "공급평형",
+        "전용면적",
+        "세대수",
+        "매매가",
+        "전세가",
+        "전세가율",
+        "투자금(매-전)",
+        "투자금(대출60%)",
+        "투자금(대출40%)"
+      ].map(normalizeColumn).includes(col.normalized);
+    },
+    rangeConfigFor(col) {
+      const normalized = col?.normalized;
+      if (normalized === normalizeColumn("세대수")) {
+        return { unit: "세대", step: 1, min: 0, defaultMax: 3000, roundTo: 100 };
+      }
+      if (normalized === normalizeColumn("전용면적")) {
+        return { unit: "㎡", step: 0.1, min: 0, defaultMax: 200, roundTo: 10 };
+      }
+      if (normalized === normalizeColumn("전세가율")) {
+        return { unit: "%", step: 0.1, min: 0, defaultMax: 100, roundTo: 10 };
+      }
+      if (
+        normalized === normalizeColumn("매매가") ||
+        normalized === normalizeColumn("전세가") ||
+        normalized === normalizeColumn("투자금(매-전)") ||
+        normalized === normalizeColumn("투자금(대출60%)") ||
+        normalized === normalizeColumn("투자금(대출40%)")
+      ) {
+        return { unit: "억", step: 0.1, min: 0, defaultMax: 30, roundTo: 5 };
+      }
+      return { unit: "평", step: 1, min: 0, defaultMax: 80, roundTo: 10 };
+    },
+    rangeBoundsFor(col) {
+      const config = this.rangeConfigFor(col);
+      const nums = this.columnValuesFor(col)
+        .map((item) => parseNumber(item.value))
+        .filter((value) => value !== null);
+      const dataMax = nums.length ? Math.max(...nums) : config.defaultMax;
+      const max = Math.max(config.defaultMax, Math.ceil(dataMax / config.roundTo) * config.roundTo);
+      const marks = [];
+      const interval = max / 4;
+      for (let index = 0; index <= 4; index += 1) {
+        const value = interval * index;
+        marks.push(Number.isInteger(value) ? value : Number(value.toFixed(1)));
+      }
+      return { min: config.min, max, step: config.step, marks };
+    },
+    formatRangeValue(col, value) {
+      const config = this.rangeConfigFor(col);
+      const rounded = Number.isInteger(value) ? value : Number(value).toFixed(1);
+      return `${rounded}${config.unit}`;
+    },
+    rangeFilterValue(col, index) {
+      const bounds = this.rangeBoundsFor(col);
+      const state = this.numericFilterState(col);
+      const parsed = parseNumber(state[index]?.value);
+      if (parsed === null) return index === 0 ? bounds.min : bounds.max;
+      return Math.min(bounds.max, Math.max(bounds.min, parsed));
+    },
+    rangeFillStyle(col) {
+      const bounds = this.rangeBoundsFor(col);
+      const lower = this.rangeFilterValue(col, 0);
+      const upper = this.rangeFilterValue(col, 1);
+      const span = Math.max(bounds.max - bounds.min, 1);
+      const left = ((lower - bounds.min) / span) * 100;
+      const right = 100 - ((upper - bounds.min) / span) * 100;
+      return { left: `${left}%`, right: `${right}%` };
+    },
+    handleRangeFilterInput(col, index, event) {
+      const bounds = this.rangeBoundsFor(col);
+      let lower = this.rangeFilterValue(col, 0);
+      let upper = this.rangeFilterValue(col, 1);
+      const next = parseNumber(event.target.value);
+      if (next === null) return;
+      if (index === 0) lower = Math.min(next, upper);
+      else upper = Math.max(next, lower);
+
+      const state = this.ensureNumericFilterState(col);
+      state[0] = lower > bounds.min ? { op: "gte", value: String(lower) } : { op: "", value: "" };
+      state[1] = upper < bounds.max ? { op: "lte", value: String(upper) } : { op: "", value: "" };
+      this.syncFiltersToAvailableOptions();
+    },
     handleNumericOpChange(col, index, event) {
       const state = this.ensureNumericFilterState(col);
       const op = event.target.value;
@@ -455,14 +555,16 @@ Vue.createApp({
       else this.filters[key] = current;
       this.syncFiltersToAvailableOptions();
     },
-    toggleFilterMenu(col, event) {
+    toggleFilterMenu(col, event, source = "table") {
       this.syncFiltersToAvailableOptions();
-      const nextKey = this.openFilterKey === col.index ? null : col.index;
+      const nextKey = this.openFilterKey === col.index && this.openFilterSource === source ? null : col.index;
       this.openFilterKey = nextKey;
       if (nextKey === null) {
+        this.openFilterSource = null;
         this.filterMenuStyle = {};
         return;
       }
+      this.openFilterSource = source;
       if (col.numeric) {
         this.ensureNumericFilterState(col);
       }
@@ -530,6 +632,7 @@ Vue.createApp({
     closeFilterMenu(event) {
       if (!this.$el.contains(event.target)) {
         this.openFilterKey = null;
+        this.openFilterSource = null;
         this.filterMenuStyle = {};
       }
     },
@@ -600,6 +703,7 @@ Vue.createApp({
       this.filters = {};
       this.numericFilters = {};
       this.openFilterKey = null;
+      this.openFilterSource = null;
       this.filterMenuStyle = {};
     },
     resetAll() {
@@ -607,7 +711,7 @@ Vue.createApp({
       this.hideEmptyRows = false;
     },
     openChipFilter(chip, event) {
-      if (chip && chip.col) this.toggleFilterMenu(chip.col, event);
+      if (chip && chip.col) this.toggleFilterMenu(chip.col, event, "chip");
     },
     toggleHideEmptyRows() {
       this.hideEmptyRows = !this.hideEmptyRows;
@@ -619,6 +723,7 @@ Vue.createApp({
       }
       this.mobileViewMode = mode;
       this.openFilterKey = null;
+      this.openFilterSource = null;
       this.filterMenuStyle = {};
     },
     tdClass(col) {

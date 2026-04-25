@@ -286,7 +286,7 @@
                   <div class="col-head">
                     <span class="col-title" :class="{ active: isFilterActive(col) }" @click.stop="toggleFilterMenu(col, $event)">{{ col.name }}</span>
                     <button class="icon-btn sort-indicator" :class="{ active: sortKey === col.index }" @click.stop="toggleSort(col)" type="button">{{ sortIcon(col) }}</button>
-                    <div v-if="openFilterKey === col.index" class="filter-menu is-open" :style="filterMenuStyle" @click.stop>
+                    <div v-if="openFilterKey === col.index && openFilterSource !== 'chip'" class="filter-menu is-open" :style="filterMenuStyle" @click.stop>
                       <template v-if="col.numeric">
                         <div class="numeric-filter">
                           <div class="numeric-row">
@@ -482,6 +482,89 @@
         @click.stop="openChipFilter(chip, $event)"
       >{{ chip.name }}</button>
     </div>
+    <div
+      v-if="openFilterSource === 'chip' && openFilterColumn"
+      class="filter-menu mobile-chip-filter is-open"
+      :style="filterMenuStyle"
+      @click.stop
+    >
+      <template v-if="isRangeSliderColumn(openFilterColumn)">
+        <div class="range-filter">
+          <div class="range-values">
+            <span>{{ formatRangeValue(openFilterColumn, rangeFilterValue(openFilterColumn, 0)) }}</span>
+            <span>{{ formatRangeValue(openFilterColumn, rangeFilterValue(openFilterColumn, 1)) }}</span>
+          </div>
+          <div class="range-slider">
+            <div class="range-track"></div>
+            <div class="range-fill" :style="rangeFillStyle(openFilterColumn)"></div>
+            <input
+              type="range"
+              :min="rangeBoundsFor(openFilterColumn).min"
+              :max="rangeBoundsFor(openFilterColumn).max"
+              :step="rangeBoundsFor(openFilterColumn).step"
+              :value="rangeFilterValue(openFilterColumn, 0)"
+              @input="handleRangeFilterInput(openFilterColumn, 0, $event)"
+            />
+            <input
+              type="range"
+              :min="rangeBoundsFor(openFilterColumn).min"
+              :max="rangeBoundsFor(openFilterColumn).max"
+              :step="rangeBoundsFor(openFilterColumn).step"
+              :value="rangeFilterValue(openFilterColumn, 1)"
+              @input="handleRangeFilterInput(openFilterColumn, 1, $event)"
+            />
+          </div>
+          <div class="range-marks">
+            <span v-for="mark in rangeBoundsFor(openFilterColumn).marks" :key="mark">{{ formatRangeValue(openFilterColumn, mark) }}</span>
+          </div>
+        </div>
+        <div class="numeric-actions">
+          <button class="numeric-clear-btn" type="button" @click="clearNumericFilters(openFilterColumn)">필터 해제</button>
+        </div>
+      </template>
+      <template v-else>
+        <template v-if="openFilterColumn.numeric">
+          <div class="numeric-filter">
+            <div class="numeric-row">
+              <select class="numeric-select" :value="numericFilterState(openFilterColumn)[0].op" @change="handleNumericOpChange(openFilterColumn, 0, $event)">
+                <option v-for="option in numericFilterOptions" :key="option.value || 'chip-default'" :value="option.value">{{ option.label }}</option>
+              </select>
+              <input class="numeric-input" type="text" inputmode="decimal" placeholder="값 입력" :value="numericFilterState(openFilterColumn)[0].value" @input="handleNumericValueInput(openFilterColumn, 0, $event)" />
+            </div>
+            <div v-if="showSecondNumericRow(openFilterColumn)" class="numeric-row">
+              <select class="numeric-select" :value="numericFilterState(openFilterColumn)[1].op" @change="handleNumericOpChange(openFilterColumn, 1, $event)">
+                <option v-for="option in numericFilterOptions" :key="option.value || 'chip-default-2'" :value="option.value">{{ option.label }}</option>
+              </select>
+              <input class="numeric-input" type="text" inputmode="decimal" placeholder="값 입력" :value="numericFilterState(openFilterColumn)[1].value" @input="handleNumericValueInput(openFilterColumn, 1, $event)" />
+            </div>
+          </div>
+          <div class="numeric-actions">
+            <button class="numeric-clear-btn" type="button" @click="clearNumericFilters(openFilterColumn)">필터 해제</button>
+          </div>
+          <div class="filter-divider"></div>
+        </template>
+        <label class="filter-item">
+          <input type="checkbox" :checked="isAllSelected(openFilterColumn)" @change="toggleAll(openFilterColumn, $event)" />
+          <span>전체</span>
+        </label>
+        <div class="filter-divider"></div>
+        <label
+          v-for="item in filterOptionsFor(openFilterColumn)"
+          :key="item.value"
+          class="filter-item"
+          :class="{ unavailable: !item.available }"
+        >
+          <input
+            type="checkbox"
+            :checked="isValueChecked(openFilterColumn, item.value)"
+            :disabled="isOptionDisabled(openFilterColumn, item)"
+            @change="toggleValue(openFilterColumn, item.value)"
+          />
+          <span class="filter-label">{{ item.label }}</span>
+          <span class="filter-count">{{ item.count.toLocaleString() }}건</span>
+        </label>
+      </template>
+    </div>
 
     <!-- Mobile View Switch -->
     <div class="mb-4 flex items-center justify-between gap-3">
@@ -526,7 +609,7 @@
                 <div class="col-head">
                   <span class="col-title" :class="{ active: isFilterActive(col) }" @click.stop="toggleFilterMenu(col, $event)">{{ col.name }}</span>
                   <button class="icon-btn sort-indicator" :class="{ active: sortKey === col.index }" @click.stop="toggleSort(col)" type="button">{{ sortIcon(col) }}</button>
-                  <div v-if="openFilterKey === col.index" class="filter-menu is-open" :style="filterMenuStyle" @click.stop>
+                  <div v-if="openFilterKey === col.index && openFilterSource !== 'chip'" class="filter-menu is-open" :style="filterMenuStyle" @click.stop>
                     <template v-if="col.numeric">
                       <div class="numeric-filter">
                         <div class="numeric-row">
