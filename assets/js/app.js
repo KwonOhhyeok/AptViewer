@@ -31,7 +31,8 @@ Vue.createApp({
       tableWrapEl: null,
       sortKey: null,
       sortDir: "asc",
-      hideEmptyRows: false
+      hideEmptyRows: false,
+      mobileViewMode: "card"
     };
   },
   computed: {
@@ -115,14 +116,25 @@ Vue.createApp({
       for (const col of this.visibleColumns) {
         const key = col.normalized;
         const bucket = new Map();
+        const counts = new Map();
         for (const row of this.sortedRows) {
-          if (!this.rowMatchesFiltersForOptions(row, key)) continue;
           const cell = (row[col.index] ?? "").toString().trim();
           const label = cell || "(빈값)";
           if (!bucket.has(cell)) bucket.set(cell, label);
+          if (this.rowMatchesFiltersForOptions(row, key)) {
+            counts.set(cell, (counts.get(cell) || 0) + 1);
+          }
         }
         values[key] = Array.from(bucket.entries())
-          .map(([value, label]) => ({ value, label }))
+          .map(([value, label]) => {
+            const count = counts.get(value) || 0;
+            return {
+              value,
+              label,
+              count,
+              available: count > 0
+            };
+          })
           .sort((a, b) => a.label.localeCompare(b.label, "ko"));
       }
       return values;
@@ -179,6 +191,87 @@ Vue.createApp({
       return this.finalRows.map((row) =>
         this.visibleColumns.map((col) => row[col.index] ?? "")
       );
+    },
+    topRegion() {
+      const pos = this.visibleColumns.findIndex(c => c.normalized === normalizeColumn("지역구"));
+      if (pos < 0 || !this.visibleRows.length) return "—";
+      const counts = {};
+      for (const row of this.visibleRows) {
+        const val = (row[pos] || "").trim();
+        if (val) counts[val] = (counts[val] || 0) + 1;
+      }
+      let top = "—", topCount = 0;
+      for (const [k, v] of Object.entries(counts)) {
+        if (v > topCount) { topCount = v; top = k; }
+      }
+      return top;
+    },
+    avgJeonseRate() {
+      const pos = this.visibleColumns.findIndex(c => c.normalized === normalizeColumn("전세가율"));
+      if (pos < 0 || !this.visibleRows.length) return "—";
+      const nums = this.visibleRows.map(r => parseNumber(r[pos])).filter(v => v !== null);
+      if (!nums.length) return "—";
+      const avg = nums.reduce((s, v) => s + v, 0) / nums.length;
+      return avg.toFixed(1) + "%";
+    },
+    avgGap() {
+      const pos = this.visibleColumns.findIndex(c => c.normalized === normalizeColumn("투자금(매-전)"));
+      if (pos < 0 || !this.visibleRows.length) return "—";
+      const nums = this.visibleRows.map(r => parseNumber(r[pos])).filter(v => v !== null);
+      if (!nums.length) return "—";
+      const avg = nums.reduce((s, v) => s + v, 0) / nums.length;
+      return avg.toFixed(1) + "억";
+    },
+    avgSalePrice() {
+      const pos = this.visibleColumns.findIndex(c => c.normalized === normalizeColumn("매매가"));
+      if (pos < 0 || !this.visibleRows.length) return "—";
+      const nums = this.visibleRows.map(r => parseNumber(r[pos])).filter(v => v !== null);
+      if (!nums.length) return "—";
+      const avg = nums.reduce((s, v) => s + v, 0) / nums.length;
+      return avg.toFixed(1) + "억";
+    },
+    hasAnyFilter() {
+      if (this.hideEmptyRows) return true;
+      if (Object.keys(this.filters).length > 0) return true;
+      return Object.values(this.numericFilters).some(rows =>
+        rows.some(r => r.op && (r.value || "").toString().trim())
+      );
+    },
+    filterChips() {
+      const chipDefs = [
+        { label: "평형", colName: "공급평형" },
+        { label: "전세가율", colName: "전세가율" },
+        { label: "지역구", colName: "지역구" }
+      ];
+      return chipDefs.map(({ label, colName }) => {
+        const col = this.visibleColumns.find(c => c.normalized === normalizeColumn(colName));
+        return { name: label, col: col || null };
+      }).filter(c => c.col);
+    },
+    mobileCards() {
+      const p = name => this.visibleColumns.findIndex(c => c.normalized === normalizeColumn(name));
+      const namePos    = p("단지명");
+      const regionPos  = p("지역구");
+      const dongPos    = p("생활권(동)");
+      const unitsPos   = p("세대수");
+      const salePos    = p("매매가");
+      const gapPos     = p("투자금(매-전)");
+      const ratePos    = p("전세가율");
+      const sizePos    = p("공급평형");
+      const builtPos   = p("준공년월");
+      const updatedPos = p("최근수정일");
+      return this.visibleRows.map(row => ({
+        name:       namePos    >= 0 ? row[namePos]    : "",
+        region:     regionPos  >= 0 ? row[regionPos]  : "",
+        dong:       dongPos    >= 0 ? row[dongPos]    : "",
+        units:      unitsPos   >= 0 ? row[unitsPos]   : "",
+        salePrice:  salePos    >= 0 ? row[salePos]    : "",
+        gap:        gapPos     >= 0 ? row[gapPos]     : "",
+        jeonseRate: ratePos    >= 0 ? row[ratePos]    : "",
+        size:       sizePos    >= 0 ? row[sizePos]    : "",
+        builtYear:  builtPos   >= 0 ? row[builtPos]   : "",
+        updatedAt:  updatedPos >= 0 ? row[updatedPos] : "",
+      }));
     }
   },
   methods: {
@@ -218,25 +311,23 @@ Vue.createApp({
       return true;
     },
     syncFiltersToAvailableOptions() {
-      for (const col of this.visibleColumns) {
-        const key = this.filterKey(col);
-        const selected = this.filters[key];
-        if (!Array.isArray(selected)) continue;
-
-        const availableValues = this.columnValuesFor(col).map((item) => item.value);
-        const availableSet = new Set(availableValues);
-        const normalizedSelection = selected.filter((value) => availableSet.has(value));
-
-        if (normalizedSelection.length !== selected.length) {
-          this.filters[key] = normalizedSelection;
-        }
-      }
+      // Preserve user-selected filters even when another filter temporarily
+      // makes their values unavailable. Option availability is represented by
+      // columnValues().available/count instead of mutating filter state.
     },
     filterKey(col) {
       return col.normalized;
     },
     columnValuesFor(col) {
       return this.columnValues[this.filterKey(col)] || [];
+    },
+    filterOptionsFor(col) {
+      const options = this.columnValuesFor(col);
+      if (col.normalized !== normalizeColumn("생활권(동)")) return options;
+      const selected = this.filters[this.filterKey(col)];
+      return options.filter(
+        (item) => item.available || (Array.isArray(selected) && selected.includes(item.value))
+      );
     },
     isFilterActive(col) {
       const key = this.filterKey(col);
@@ -337,6 +428,9 @@ Vue.createApp({
       if (!selected) return true;
       return selected.includes(value);
     },
+    isOptionDisabled(col, item) {
+      return !item.available && !this.isValueChecked(col, item.value);
+    },
     toggleAll(col, event) {
       const checked = event.target.checked;
       const key = this.filterKey(col);
@@ -349,7 +443,7 @@ Vue.createApp({
     },
     toggleValue(col, value) {
       const key = this.filterKey(col);
-      const values = this.columnValuesFor(col).map((item) => item.value);
+      const values = this.filterOptionsFor(col).map((item) => item.value);
       const valueSet = new Set(values);
       const current = this.filters[key]
         ? this.filters[key].filter((item) => valueSet.has(item))
@@ -508,8 +602,24 @@ Vue.createApp({
       this.openFilterKey = null;
       this.filterMenuStyle = {};
     },
+    resetAll() {
+      this.resetFilters();
+      this.hideEmptyRows = false;
+    },
+    openChipFilter(chip, event) {
+      if (chip && chip.col) this.toggleFilterMenu(chip.col, event);
+    },
     toggleHideEmptyRows() {
       this.hideEmptyRows = !this.hideEmptyRows;
+    },
+    setMobileViewMode(mode) {
+      if (mode !== "table" && mode !== "card") {
+        this.mobileViewMode = "card";
+        return;
+      }
+      this.mobileViewMode = mode;
+      this.openFilterKey = null;
+      this.filterMenuStyle = {};
     },
     tdClass(col) {
       if (!col) return "";
@@ -554,6 +664,9 @@ Vue.createApp({
     }
   },
   async mounted() {
+    if (this.mobileViewMode !== "table" && this.mobileViewMode !== "card") {
+      this.mobileViewMode = "card";
+    }
     document.addEventListener("click", this.closeFilterMenu);
     window.addEventListener("resize", this.updateViewportWidth);
     window.addEventListener("scroll", this.repositionOpenFilterMenu, true);
